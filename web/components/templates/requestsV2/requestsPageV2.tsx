@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import ThemedTableV5 from "../../shared/themed/table/themedTableV5";
 import AuthHeader from "../../shared/authHeader";
 import useRequestsPageV2 from "./useRequestsPageV2";
@@ -14,11 +14,19 @@ import {
   getTimeIntervalAgo,
   TimeInterval,
 } from "../../../lib/timeCalculations/time";
-import { INITIAL_COLUMNS } from "./initialColumns";
+import { getInitialColumns } from "./initialColumns";
 import { useDebounce } from "../../../services/hooks/debounce";
 import { UIFilterRow } from "../../shared/themed/themedAdvancedFilters";
 import { ArrowPathIcon } from "@heroicons/react/24/outline";
 import { clsx } from "../../shared/clsx";
+import { useRouter } from "next/router";
+import { HeliconeRequest } from "../../../lib/api/request/request";
+import getRequestBuilder from "./builder/requestBuilder";
+import { Result } from "../../../lib/result";
+import { useLocalStorage } from "../../../services/hooks/localStorage";
+import useNotification from "../../shared/notification/useNotification";
+import { Switch } from "@headlessui/react";
+import { BoltIcon, BoltSlashIcon, XMarkIcon } from "@heroicons/react/20/solid";
 
 interface RequestsPageV2Props {
   currentPage: number;
@@ -28,15 +36,100 @@ interface RequestsPageV2Props {
     sortDirection: SortDirection | null;
     isCustomProperty: boolean;
   };
+  isCached?: boolean;
+  initialRequestId?: string;
+}
+
+function getSortLeaf(
+  sortKey: string | null,
+  sortDirection: SortDirection | null,
+  isCustomProperty: boolean,
+  isCached: boolean
+): SortLeafRequest {
+  if (isCached && sortKey === "created_at") {
+    sortKey = "cache_created_at";
+  }
+  if (sortKey && sortDirection && isCustomProperty) {
+    return {
+      properties: {
+        [sortKey]: sortDirection,
+      },
+    };
+  } else if (sortKey && sortDirection) {
+    return {
+      [sortKey]: sortDirection,
+    };
+  } else if (isCached) {
+    return {
+      cache_created_at: "desc",
+    };
+  } else {
+    return {
+      created_at: "desc",
+    };
+  }
 }
 
 const RequestsPageV2 = (props: RequestsPageV2Props) => {
-  const { currentPage, pageSize, sort } = props;
+  const {
+    currentPage,
+    pageSize,
+    sort,
+    isCached = false,
+    initialRequestId,
+  } = props;
+  const [isLive, setIsLive] = useLocalStorage("isLive", false);
+  const { setNotification } = useNotification();
+
+  // set the initial selected data on component load
+  useEffect(() => {
+    if (initialRequestId) {
+      const fetchRequest = async () => {
+        const resp = await fetch(`/api/request/`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            filter: {
+              left: {
+                request: {
+                  id: {
+                    equals: initialRequestId,
+                  },
+                },
+              },
+              operator: "and",
+              right: "all",
+            } as FilterNode,
+            offset: 0,
+            limit: 1,
+            sort: {},
+          }),
+        })
+          .then(
+            (res) => res.json() as Promise<Result<HeliconeRequest[], string>>
+          )
+          .then((res) => {
+            const { data, error } = res;
+            if (data !== null && data.length > 0) {
+              const normalizedRequest = getRequestBuilder(data[0]).build();
+              setSelectedData(normalizedRequest);
+              setOpen(true);
+              console.log(normalizedRequest);
+            }
+          });
+      };
+      fetchRequest();
+    }
+  }, [initialRequestId]);
 
   const [page, setPage] = useState<number>(currentPage);
   const [currentPageSize, setCurrentPageSize] = useState<number>(pageSize);
   const [open, setOpen] = useState(false);
-  const [selectedData, setSelectedData] = useState<NormalizedRequest>();
+  const [selectedData, setSelectedData] = useState<
+    NormalizedRequest | undefined
+  >(undefined);
   const [timeFilter, setTimeFilter] = useState<FilterNode>({
     request: {
       created_at: {
@@ -46,22 +139,15 @@ const RequestsPageV2 = (props: RequestsPageV2Props) => {
   });
   const [advancedFilters, setAdvancedFilters] = useState<UIFilterRow[]>([]);
 
+  const router = useRouter();
   const debouncedAdvancedFilter = useDebounce(advancedFilters, 500);
 
-  const sortLeaf: SortLeafRequest =
-    sort.sortKey && sort.sortDirection && sort.isCustomProperty
-      ? {
-          properties: {
-            [sort.sortKey]: sort.sortDirection,
-          },
-        }
-      : sort.sortKey && sort.sortDirection
-      ? {
-          [sort.sortKey]: sort.sortDirection,
-        }
-      : {
-          created_at: "desc",
-        };
+  const sortLeaf: SortLeafRequest = getSortLeaf(
+    sort.sortKey,
+    sort.sortDirection,
+    sort.isCustomProperty,
+    isCached
+  );
 
   const {
     count,
@@ -81,7 +167,9 @@ const RequestsPageV2 = (props: RequestsPageV2Props) => {
       operator: "and",
       right: "all",
     },
-    sortLeaf
+    sortLeaf,
+    isCached,
+    isLive
   );
 
   const onPageSizeChangeHandler = async (newPageSize: number) => {
@@ -126,7 +214,7 @@ const RequestsPageV2 = (props: RequestsPageV2Props) => {
     });
   };
 
-  const columnsWithProperties = [...INITIAL_COLUMNS].concat(
+  const columnsWithProperties = [...getInitialColumns(isCached)].concat(
     properties.map((property) => {
       return {
         accessorFn: (row) =>
@@ -142,22 +230,88 @@ const RequestsPageV2 = (props: RequestsPageV2Props) => {
     })
   );
 
+  const onRowSelectHandler = (row: NormalizedRequest) => {
+    setSelectedData(row);
+    setOpen(true);
+    router.push(
+      {
+        pathname: "/requests",
+        query: { ...router.query, requestId: row.id },
+      },
+      undefined,
+      {}
+    );
+  };
+
   return (
     <div>
       <AuthHeader
-        title={"Requests"}
+        title={isCached ? "Cached Requests" : "Requests"}
         headerActions={
-          <button
-            onClick={() => refetch()}
-            className="font-medium text-black text-sm items-center flex flex-row hover:text-sky-700"
-          >
-            <ArrowPathIcon
-              className={clsx(
-                isDataLoading ? "animate-spin" : "",
-                "h-5 w-5 inline"
-              )}
-            />
-          </button>
+          <div className="flex flex-row gap-2">
+            <button
+              onClick={() => refetch()}
+              className="font-medium text-black text-sm items-center flex flex-row hover:text-sky-700"
+            >
+              <ArrowPathIcon
+                className={clsx(
+                  isDataLoading ? "animate-spin" : "",
+                  "h-5 w-5 inline"
+                )}
+              />
+            </button>
+          </div>
+        }
+        actions={
+          <>
+            <Switch.Group
+              as="div"
+              className="flex items-center space-x-3 hover:cursor-pointer"
+            >
+              <Switch.Label as="span" className="text-sm">
+                <span className="font-semibold text-gray-700">Live</span>
+              </Switch.Label>
+              <Switch
+                checked={isLive}
+                onChange={setIsLive}
+                className={clsx(
+                  isLive ? "bg-emerald-500" : "bg-gray-200",
+                  "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                )}
+              >
+                <span className="sr-only">Use setting</span>
+                <span
+                  className={clsx(
+                    isLive ? "translate-x-5" : "translate-x-0",
+                    "pointer-events-none relative inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                  )}
+                >
+                  <span
+                    className={clsx(
+                      isLive
+                        ? "opacity-0 duration-100 ease-out"
+                        : "opacity-100 duration-200 ease-in",
+                      "absolute inset-0 flex h-full w-full items-center justify-center transition-opacity"
+                    )}
+                    aria-hidden="true"
+                  >
+                    <BoltSlashIcon className="h-3 w-3 text-gray-400" />
+                  </span>
+                  <span
+                    className={clsx(
+                      isLive
+                        ? "opacity-100 duration-200 ease-in"
+                        : "opacity-0 duration-100 ease-out",
+                      "absolute inset-0 flex h-full w-full items-center justify-center transition-opacity"
+                    )}
+                    aria-hidden="true"
+                  >
+                    <BoltIcon className="h-3 w-3 text-emerald-500" />
+                  </span>
+                </span>
+              </Switch>
+            </Switch.Group>
+          </>
         }
       />
       <div className="flex flex-col space-y-4">
@@ -177,7 +331,11 @@ const RequestsPageV2 = (props: RequestsPageV2Props) => {
             const flattenedRequest: any = {};
             Object.entries(request).forEach(([key, value]) => {
               // key is properties and value is not null
-              if (key === "customProperties" && value !== null) {
+              if (
+                key === "customProperties" &&
+                value !== null &&
+                value !== undefined
+              ) {
                 Object.entries(value).forEach(([key, value]) => {
                   if (value !== null) {
                     flattenedRequest[key] = value;
@@ -190,11 +348,11 @@ const RequestsPageV2 = (props: RequestsPageV2Props) => {
             return flattenedRequest;
           })}
           timeFilter={{
+            defaultValue: "24h",
             onTimeSelectHandler: onTimeSelectHandler,
           }}
           onRowSelect={(row) => {
-            setSelectedData(row);
-            setOpen(true);
+            onRowSelectHandler(row);
           }}
         />
         <TableFooter

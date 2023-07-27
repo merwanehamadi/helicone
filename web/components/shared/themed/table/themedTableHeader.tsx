@@ -1,4 +1,8 @@
-import { FunnelIcon, ViewColumnsIcon } from "@heroicons/react/24/outline";
+import {
+  BoltIcon,
+  FunnelIcon,
+  ViewColumnsIcon,
+} from "@heroicons/react/24/outline";
 import { Column } from "@tanstack/react-table";
 import { Dispatch, SetStateAction, useEffect, useState } from "react";
 import { DateRange } from "react-day-picker";
@@ -11,6 +15,9 @@ import { ThemedPill } from "../themedPill";
 import ThemedTimeFilter from "../themedTimeFilter";
 import ExportButton from "../../../templates/requestsV2/exportButton";
 import ViewColumns from "../../../templates/requestsV2/viewColumns";
+import { Toggle } from "../themedToggle";
+import { useLocalStorage } from "../../../../services/hooks/localStorage";
+import useNotification from "../../notification/useNotification";
 
 interface ThemedTableHeaderProps<T> {
   rows: T[];
@@ -35,14 +42,14 @@ interface ThemedTableHeaderProps<T> {
 
   // define this if you want the time filter
   timeFilter?: {
+    defaultValue: "24h" | "7d" | "1m" | "3m" | "all";
     onTimeSelectHandler: (key: TimeInterval, value: string) => void;
   };
 }
 
 export default function ThemedTableHeader<T>(props: ThemedTableHeaderProps<T>) {
+  const { setNotification } = useNotification();
   const { rows, columnsFilter, timeFilter, advancedFilters } = props;
-
-  console.log(columnsFilter?.columns);
 
   const [showFilters, setShowFilters] = useState(false);
 
@@ -55,6 +62,7 @@ export default function ThemedTableHeader<T>(props: ThemedTableHeaderProps<T>) {
     setShowFilters(!showFilters);
     window.localStorage.setItem("showFilters", JSON.stringify(!showFilters));
   };
+  const [isLive, setIsLive] = useLocalStorage("isLive", false);
 
   return (
     <div className="flex flex-col space-y-4">
@@ -79,17 +87,19 @@ export default function ThemedTableHeader<T>(props: ThemedTableHeaderProps<T>) {
           <div />
         )}
         <div className="flex flex-row gap-2">
-          <button
-            onClick={showFilterHandler}
-            className={clsx(
-              "bg-white border border-gray-300 rounded-lg px-2.5 py-1.5 hover:bg-sky-50 flex flex-row items-center gap-2"
-            )}
-          >
-            <FunnelIcon className="h-5 w-5 text-gray-900" />
-            <p className="text-sm font-medium text-gray-900 hidden sm:block">
-              {showFilters ? "Hide" : "Show"} Filters
-            </p>
-          </button>
+          {advancedFilters && (
+            <button
+              onClick={showFilterHandler}
+              className={clsx(
+                "bg-white border border-gray-300 rounded-lg px-2.5 py-1.5 hover:bg-sky-50 flex flex-row items-center gap-2"
+              )}
+            >
+              <FunnelIcon className="h-5 w-5 text-gray-900" />
+              <p className="text-sm font-medium text-gray-900 hidden sm:block">
+                {showFilters ? "Hide" : "Show"} Filters
+              </p>
+            </button>
+          )}
           {columnsFilter && (
             <ViewColumns
               columns={columnsFilter.columns}

@@ -164,6 +164,8 @@ const ThemedTimeFilter = (props: ThemedTimeFilterProps) => {
           type="button"
           disabled={isFetching}
           onClick={() => {
+            console.log(1);
+            console.log(option.key);
             setActive(option.key);
             onSelect(option.key, option.value);
           }}

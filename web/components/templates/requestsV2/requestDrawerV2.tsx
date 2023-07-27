@@ -23,6 +23,13 @@ interface RequestDrawerV2Props {
   request?: NormalizedRequest;
   properties: string[];
 }
+function getPathName(url: string) {
+  try {
+    return new URL(url).pathname;
+  } catch (e) {
+    return url;
+  }
+}
 
 const RequestDrawerV2 = (props: RequestDrawerV2Props) => {
   const { open, setOpen, request, properties } = props;
@@ -31,38 +38,60 @@ const RequestDrawerV2 = (props: RequestDrawerV2Props) => {
   const { setNotification } = useNotification();
   const router = useRouter();
 
-  // set the mode to pretty if the drawer closes
+  const setOpenHandler = (drawerOpen: boolean) => {
+    // if the drawerOpen boolean is true, open the drawer
+    if (drawerOpen) {
+      setOpen(true);
+    }
+    // if the drawerOpen boolean is false, close the drawer and clear the requestId
+    else {
+      setOpen(false);
+      const { pathname, query } = router;
+      delete router.query.requestId;
+      router.replace({ pathname, query }, undefined, { shallow: true });
+    }
+  };
+
+  // set the mode to pretty if the drawer closes, also clear the requestId
   useEffect(() => {
     if (!open) {
       setMode("pretty");
     }
-  }, [open]);
+  }, [open, router]);
 
   return (
     <ThemedDrawer
       open={open}
-      setOpen={setOpen}
+      setOpen={setOpenHandler}
       actions={
         <div className="w-full flex flex-row justify-between pl-1">
-          <button
-            onClick={() => {
-              if (request) {
-                router.push("/playground?request=" + request.id);
-              }
-            }}
-            className="hover:bg-gray-200 rounded-md -m-1 p-1"
-          >
-            <BeakerIcon className="h-5 w-5" />
-          </button>
-          <button
-            onClick={() => {
-              setNotification("Copied to clipboard", "success");
-              navigator.clipboard.writeText(JSON.stringify(request, null, 4));
-            }}
-            className="hover:bg-gray-200 rounded-md -m-1 p-1"
-          >
-            <ClipboardDocumentIcon className="h-5 w-5" />
-          </button>
+          <Tooltip title="Playground">
+            <button
+              onClick={() => {
+                if (request) {
+                  router.push("/playground?request=" + request.id);
+                }
+              }}
+              className="hover:bg-gray-200 rounded-md -m-1 p-1"
+            >
+              <BeakerIcon className="h-5 w-5" />
+            </button>
+          </Tooltip>
+          <Tooltip title="Copy">
+            <button
+              onClick={() => {
+                setNotification("Copied to clipboard", "success");
+                const copy = { ...request };
+                delete copy.render;
+                navigator.clipboard.writeText(
+                  JSON.stringify(copy || {}, null, 4)
+                );
+              }}
+              className="hover:bg-gray-200 rounded-md -m-1 p-1"
+            >
+              <ClipboardDocumentIcon className="h-5 w-5" />
+            </button>
+          </Tooltip>
         </div>
       }
     >
@@ -110,6 +139,16 @@ const RequestDrawerV2 = (props: RequestDrawerV2Props) => {
             <li className="flex flex-row justify-between items-center py-2 gap-4">
               <p className="font-semibold text-gray-900">User</p>
               <p className="text-gray-700 truncate">{request.user}</p>
+            </li>
+            <li className="flex flex-row justify-between items-center py-2 gap-4">
+              <p className="font-semibold text-gray-900">Path</p>
+              <p className="text-gray-700 truncate">
+                {getPathName(request.path)}
+              </p>
+            </li>
+            <li className="flex flex-row justify-between items-center py-2 gap-4">
+              <p className="font-semibold text-gray-900">ID</p>
+              <p className="text-gray-700 truncate">{request.id}</p>
             </li>
           </ul>
           {request.customProperties &&

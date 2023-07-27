@@ -37,8 +37,7 @@ const PropertyCard = (props: PropertyCardPageProps) => {
       labelUnits: "(est.)",
       icon: CurrencyDollarIcon,
       isLoading: keyMetrics.totalCost.isLoading,
-      onInformationHref:
-        "https://docs.helicone.ai/how-it-works/how-we-calculate-costs",
+      onInformationHref: "https://docs.helicone.ai/faq/how-we-calculate-cost",
     },
     {
       value: +(keyMetrics.totalRequests?.data?.data?.toFixed(2) ?? 0),
@@ -79,6 +78,7 @@ const PropertyCard = (props: PropertyCardPageProps) => {
             Showing top 10 results
           </div>
           <ThemedTableV5
+            dataLoading={false}
             defaultData={
               valueMetrics.aggregatedKeyMetrics?.data?.data?.map((d) => ({
                 ...d,

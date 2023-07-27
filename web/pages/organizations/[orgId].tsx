@@ -1,7 +1,4 @@
-import {
-  createServerSupabaseClient,
-  User,
-} from "@supabase/auth-helpers-nextjs";
+import { createPagesServerClient, User } from "@supabase/auth-helpers-nextjs";
 import { GetServerSidePropsContext } from "next";
 import { useRouter } from "next/router";
 import AuthHeader from "../../components/shared/authHeader";
@@ -38,7 +35,7 @@ const OrganizationId = (props: OrganizationIdProps) => {
     <MetaData title="Organizations">
       <AuthLayout user={user}>
         <AuthHeader
-          title={organization?.name || (orgId as string)}
+          title={""}
           breadcrumb={{
             href: "/organizations",
             title: "Organizations",
@@ -54,7 +51,7 @@ export default OrganizationId;
 
 export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
   // Create authenticated Supabase Client
-  const supabase = createServerSupabaseClient(ctx);
+  const supabase = createPagesServerClient(ctx);
   // Check if we have a session
   const {
     data: { session },

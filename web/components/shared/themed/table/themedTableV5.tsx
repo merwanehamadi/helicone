@@ -12,7 +12,7 @@ import {
   VisibilityState,
 } from "@tanstack/react-table";
 import { useRouter } from "next/router";
-import { Dispatch, SetStateAction, useEffect, useState } from "react";
+import React, { Dispatch, SetStateAction, useEffect, useState } from "react";
 import { DateRange } from "react-day-picker";
 import { Result } from "../../../../lib/result";
 import { TimeInterval } from "../../../../lib/timeCalculations/time";
@@ -31,9 +31,7 @@ interface ThemedTableV5Props<T> {
   defaultData: T[];
   defaultColumns: ColumnDef<T>[];
   tableKey: string;
-  dataLoading?: boolean;
-
-  // TODO: change this to a more generic type???
+  dataLoading: boolean;
   advancedFilters?: {
     filterMap: SingleFilterDef<any>[];
     filters: UIFilterRow[];
@@ -44,27 +42,17 @@ interface ThemedTableV5Props<T> {
     ) => Promise<Result<void, string>>;
   };
   timeFilter?: {
+    defaultValue: "24h" | "7d" | "1m" | "3m" | "all";
     onTimeSelectHandler: (key: TimeInterval, value: string) => void;
   };
   exportData?: any[];
-  // header?: {
-  //   flattenedExportData: any[];
-  //   onTimeSelectHandler: (key: TimeInterval, value: string) => void;
-  //   // TODO: rewrite these filters
-  //   filterMap: SingleFilterDef<any>[];
-  //   filters: UIFilterRow[];
-  //   setAdvancedFilters: Dispatch<SetStateAction<UIFilterRow[]>>;
-  //   searchPropertyFilters: (
-  //     property: string,
-  //     search: string
-  //   ) => Promise<Result<void, string>>;
-  // };
   sortable?: {
     sortKey: string | null;
     sortDirection: SortDirection | null;
     isCustomProperty: boolean;
   };
   onRowSelect?: (row: T) => void;
+  chart?: React.ReactNode;
 }
 
 export default function ThemedTableV5<T>(props: ThemedTableV5Props<T>) {
@@ -78,6 +66,7 @@ export default function ThemedTableV5<T>(props: ThemedTableV5Props<T>) {
     timeFilter,
     sortable,
     onRowSelect,
+    chart,
   } = props;
 
   const router = useRouter();
@@ -133,15 +122,16 @@ export default function ThemedTableV5<T>(props: ThemedTableV5Props<T>) {
         timeFilter={
           timeFilter
             ? {
+                defaultValue: timeFilter.defaultValue,
                 onTimeSelectHandler: timeFilter.onTimeSelectHandler,
               }
             : undefined
         }
         rows={exportData || []}
       />
-
+      {chart}
       {dataLoading ? (
-        <LoadingAnimation title="Loading Requests..." />
+        <LoadingAnimation title="Loading Data..." />
       ) : rows.length === 0 ? (
         <div className="bg-white h-48 w-full rounded-lg border border-gray-300 py-2 px-4 flex flex-col space-y-3 justify-center items-center">
           <TableCellsIcon className="h-12 w-12 text-gray-400" />
