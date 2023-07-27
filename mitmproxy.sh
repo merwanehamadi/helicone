@@ -62,7 +62,7 @@ def request(flow):
         flow.request.headers["Helicone-Cache-Enabled"] = "true"
     for key in os.environ.keys():
         if key.startswith("HELICONE_PROPERTY"):
-            header_name = "Helicone-Property-" + key.split("_")[2]
+            header_name = "Helicone-Property-" + key[len("HELICONE_PROPERTY_"):]
             print("Adding header: ", header_name, " with value: ", os.environ.get(key))
             flow.request.headers[header_name] = os.environ.get(key)
     json_file_path = os.path.expanduser("~/.helicone/custom_properties.json")
